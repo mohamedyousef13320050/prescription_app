@@ -1,0 +1,36 @@
+medicine_id,trade_name_ar,trade_name_en,active_ingredient,dosage_form,concentration,manufacturer,price_egp
+1,بانادول إكسترا,Panadol Extra,Paracetamol + Caffeine,أقراص مغلفة (Tablets),500 mg / 65 mg,GSK,54.00
+2,بانادول أدفانس,Panadol Advance,Paracetamol,أقراص مغلفة (Tablets),500 mg,GSK,46.00
+3,أوجمنتين,Augmentin,Amoxicillin + Clavulanic Acid,أقراص (Tablets),1000 mg,GSK,176.00
+4,أوجمنتين شراب,Augmentin ES Suspension,Amoxicillin + Clavulanic Acid,شراب معلق (Suspension),600 mg / 5 ml,GSK,135.00
+5,هاي بيوتك,Hibiotic,Amoxicillin + Clavulanic Acid,أقراص (Tablets),1000 mg,Amoun,144.00
+6,بروفين,Brufen,Ibuprofen,أقراص (Tablets),400 mg,Kahira / Abbott,66.00
+7,بروفين شراب,Brufen Syrup,Ibuprofen,شراب (Syrup),100 mg / 5 ml,Kahira / Abbott,48.00
+8,زيثروماكس,Zithromax,Azithromycin,أقراص (Tablets),500 mg,Pfizer,135.00
+9,زيسروسين,Zisrocin,Azithromycin,كبسولات (Capsules),500 mg,Eipico,87.00
+10,كونجيستال,Congestal,Paracetamol + Chlorpheniramine + Pseudoephedrine,أقراص (Tablets),650 mg / 4 mg / 60 mg,Kahira Pharm,43.00
+11,ون تو ثري,1 2 3 (One Two Three),Paracetamol + Chlorpheniramine + Pseudoephedrine,أقراص (Tablets),500 mg / 2 mg / 30 mg,Hikma Pharma,39.00
+12,كتافلام,Cataflam,Diclofenac Potassium,أقراص (Tablets),50 mg,Novartis,86.00
+13,كتافاست,Catafast,Diclofenac Potassium,أكياس فوارة (Sachets),50 mg,Novartis,99.00
+14,فولتارين,Voltaren,Diclofenac Sodium,أمبولات للحقن (Ampoules),75 mg / 3 ml,Novartis,81.00
+15,كونترولوك,Controloc,Pantoprazole,أقراص (Tablets),40 mg,Takeda,185.00
+16,أنتودين,Antodin,Famotidine,أقراص (Tablets),40 mg,Amoun,72.00
+17,نيكسيوم,Nexium,Esomeprazole,أقراص (Tablets),40 mg,AstraZeneca,266.00
+18,أوميز,Omez,Omeprazole,كبسولات (Capsules),20 mg,Pharaonia,48.00
+19,فلاجيل,Flagyl,Metronidazole,أقراص (Tablets),500 mg,Sanofi,47.00
+20,أمريزول,Amrizole,Metronidazole,أقراص (Tablets),500 mg,Amriya,36.00
+21,سيبروفار,Ciprofar,Ciprofloxacin,أقراص (Tablets),500 mg,Pharco,69.00
+22,تافانيك,Tavanic,Levofloxacin,أقراص (Tablets),500 mg,Sanofi,155.00
+23,جلوكوفاج,Glucophage,Metformin HCl,أقراص (Tablets),1000 mg,Merck / MinaPharm,75.00
+24,سيدوفاج,Cidophage,Metformin HCl,أقراص ممتدة المفعول (Retard),850 mg,CID,45.00
+25,أماريل,Amaryl,Glimepiride,أقراص (Tablets),3 mg,Sanofi,93.00
+26,كونكور,Concor,Bisoprolol Fumarate,أقراص (Tablets),5 mg,Merck / MinaPharm,81.00
+27,كونكور بلس,Concor Plus,Bisoprolol + Hydrochlorothiazide,أقراص (Tablets),5 mg / 12.5 mg,Merck / MinaPharm,90.00
+28,نورفاسك,Norvasc,Amlodipine,كبسولات (Capsules),5 mg,Pfizer,96.00
+29,بلافيكس,Plavix,Clopidogrel,أقراص (Tablets),75 mg,Sanofi,252.00
+30,ليبيتور,Lipitor,Atorvastatin,أقراص (Tablets),20 mg,Pfizer,175.00
+31,كريستور,Crestor,Rosuvastatin,أقراص (Tablets),10 mg,AstraZeneca,215.00
+32,تيلفاست,Telfast,Fexofenadine,أقراص (Tablets),180 mg,Sanofi,115.00
+33,زيرتك,Zyrtec,Cetirizine,أقراص (Tablets),10 mg,GSK,68.00
+34,فنتولين,Ventolin,Salbutamol,بخاخ (Inhaler),100 mcg,GSK,112.00
+35,ميلجا أدفانس,Milga Advance,Benfotiamine + B6 + B12,أقراص (Tablets),300 / 100 mg,Eva Pharma,105.00

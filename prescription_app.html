@@ -1,0 +1,1324 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>نظام الروشتة الطبية الذكية — كتابة ومطابقة وحفظ الروشتات</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Cairo', 'Inter', sans-serif; background-color: #f1f5f9; color: #0f172a; }
+    .canvas-box {
+      touch-action: none;
+      cursor: crosshair;
+      background-color: #ffffff;
+      background-image:
+        linear-gradient(to bottom, transparent 47px, #e2e8f0 48px),
+        radial-gradient(#cbd5e1 1px, transparent 1px);
+      background-size: 100% 48px, 24px 24px;
+    }
+    @media print {
+      body { background: #ffffff !important; }
+      .no-print { display: none !important; }
+      .print-only-sheet { box-shadow: none !important; border: none !important; margin: 0 !important; padding: 0 !important; width: 100% !important; max-width: 100% !important; }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- الشريط العلوي -->
+  <header class="bg-[#0f4c5c] text-white shadow-md no-print">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-white/15 flex items-center justify-center font-extrabold text-xl">Rx</div>
+        <div>
+          <h1 class="text-lg md:text-xl font-bold leading-tight">نظام الروشتة الطبية الذكية المصرية (الإصدار المطور)</h1>
+          <p class="text-xs text-teal-100">مساحة كتابة موسعة + محرك ذكي مزدوج للتعرف على خط اليد (عربي/إنجليزي) + إضافة للروشتة بضغطة واحدة</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="navHomeBtn" type="button" class="px-3.5 py-2 rounded-lg text-sm font-bold bg-white/15 hover:bg-white/25 transition">
+          الصفحة الرئيسية وسجل الروشتات (<span id="savedCountBadge">0</span>)
+        </button>
+        <button id="navNewRxBtn" type="button" class="px-4 py-2 rounded-lg text-sm font-bold bg-emerald-500 hover:bg-emerald-600 text-white shadow transition">
+          + اكتب روشتة جديدة
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- إشعار تفاعلي داخل الصفحة -->
+  <div id="toastBanner" class="hidden fixed top-4 left-1/2 -translate-x-1/2 z-50 px-6 py-3.5 rounded-xl shadow-xl text-sm font-extrabold bg-slate-900 text-white border border-teal-400 no-print"></div>
+
+  <!-- ========================================================= -->
+  <!-- الشاشة الأولى: شاشة البداية + زر اكتب روشتة + سجل الروشتات المحفوظة -->
+  <!-- ========================================================= -->
+  <main id="homeView" class="flex-1 max-w-6xl w-full mx-auto px-4 py-8 no-print">
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-10 mb-8 flex flex-col md:flex-row items-center justify-between gap-6">
+      <div class="space-y-3 max-w-2xl">
+        <span class="inline-block px-3 py-1 rounded-full text-xs font-bold bg-teal-50 text-[#0f4c5c] border border-teal-200">نظام العيادة الذكية — محرك تعرف ذكي على خط اليد</span>
+        <h2 class="text-2xl md:text-3xl font-extrabold text-slate-900">أهلاً بك يا دكتور في منصة كتابة ومطابقة الروشتات</h2>
+        <p class="text-slate-600 text-sm md:text-base leading-relaxed">
+          اضغط على <strong>(اكتب روشتة جديدة)</strong> للدخول إلى صفحة الروشتة؛ ستجد مساحة كتابة كبيرة جداً ومريحة لخط اليد مع تعرف تلقائي ذكي بمجرد التوقف عن الكتابة، وإمكانية إضافة الدواء للروشتة بضغطة زر واحدة.
+        </p>
+        <div class="pt-2 flex flex-wrap gap-3">
+          <button id="heroStartRxBtn" type="button" class="px-6 py-3.5 rounded-xl font-extrabold text-base bg-[#0f4c5c] hover:bg-[#136175] text-white shadow-md transition">
+            اكتب روشتة جديدة الآن &larr;
+          </button>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3 w-full md:w-72 shrink-0">
+        <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center">
+          <div class="text-2xl font-extrabold text-[#0f4c5c]" id="statMedCount">35</div>
+          <div class="text-xs text-slate-600 font-semibold mt-1">دواء مصري مسجل</div>
+        </div>
+        <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-center">
+          <div class="text-2xl font-extrabold text-emerald-700" id="statSavedRxCount">0</div>
+          <div class="text-xs text-emerald-800 font-semibold mt-1">روشتة محفوظة</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- قسم الروشتات المحفوظة -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-extrabold text-slate-900">سجل الروشتات المحفوظة</h3>
+        <span class="text-xs text-slate-500">يتم حفظ أي روشتة تصدرها هنا تلقائياً للرجوع إليها أو إعادة طباعتها</span>
+      </div>
+      <div id="savedPrescriptionsList" class="space-y-3"></div>
+    </div>
+  </main>
+
+  <!-- ========================================================= -->
+  <!-- الشاشة الثانية: القائمة الجانبية للبيانات الأساسية + كتابة الأدوية + المطابقة + الطباعة -->
+  <!-- ========================================================= -->
+  <section id="workspaceView" class="hidden flex-1 max-w-7xl w-full mx-auto px-4 py-6">
+
+    <!-- شريط إرشادي واضح جداً لطريقة إضافة الدواء بعد الكتابة بخط اليد -->
+    <div class="bg-teal-900 text-white rounded-2xl p-4 mb-6 shadow-sm no-print">
+      <div class="text-xs font-extrabold text-teal-200 mb-2">كيف تضيف الدواء للروشتة بعد كتابته بخط اليد؟ (3 خطوات سريعة):</div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs md:text-sm">
+        <div class="bg-white/10 rounded-xl p-3 flex items-center gap-3">
+          <span class="w-7 h-7 rounded-full bg-emerald-500 text-white font-extrabold flex items-center justify-center shrink-0">1</span>
+          <span><strong>اكتب اسم الدواء بخط يدك</strong> في المساحة البيضاء الكبيرة (سيتم قراءة خطك تلقائياً بعد ثانية من رفع يدك، أو اضغط زر <strong>تحويل خط اليد إلى نص</strong>).</span>
+        </div>
+        <div class="bg-white/10 rounded-xl p-3 flex items-center gap-3">
+          <span class="w-7 h-7 rounded-full bg-emerald-500 text-white font-extrabold flex items-center justify-center shrink-0">2</span>
+          <span><strong>راجع البدائل المقترحة</strong> التي ظهرت تلقائياً تحت اللوحة أو في جدول المقارنة، وحدد الجرعة إذا أردت تغييرها.</span>
+        </div>
+        <div class="bg-white/10 rounded-xl p-3 flex items-center gap-3">
+          <span class="w-7 h-7 rounded-full bg-emerald-500 text-white font-extrabold flex items-center justify-center shrink-0">3</span>
+          <span>اضغط على الزر الأخضر <strong>(+ أضف للروشتة فوراً)</strong> أمام الدواء في الجدول أو في صندوق التأكيد لينزل في الروشتة مباشرة!</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+      <!-- القائمة الجانبية (Sidebar) للمعلومات الأساسية -->
+      <aside id="sidebarPanel" class="lg:col-span-4 xl:col-span-3 bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-4 no-print">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+          <h2 class="text-base font-extrabold text-[#0f4c5c]">1. البيانات الأساسية (الجانبية)</h2>
+          <button id="backToHomeBtn" type="button" class="text-xs font-bold text-slate-500 hover:text-slate-800 underline">عودة للرئيسية</button>
+        </div>
+
+        <div class="space-y-3 text-sm">
+          <div>
+            <label for="inClinicName" class="block text-xs font-bold text-slate-700 mb-1">اسم العيادة / المركز الطبي</label>
+            <input id="inClinicName" type="text" value="عيادة الشفاء التخصصية" class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:border-[#0f4c5c] focus:outline-none">
+          </div>
+          <div>
+            <label for="inClinicAddress" class="block text-xs font-bold text-slate-700 mb-1">عنوان وتليفون العيادة</label>
+            <input id="inClinicAddress" type="text" value="طنطا - شارع البحر" class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:border-[#0f4c5c] focus:outline-none">
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label for="inDoctorName" class="block text-xs font-bold text-slate-700 mb-1">اسم الدكتور</label>
+              <input id="inDoctorName" type="text" placeholder="د. أحمد..." class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:border-[#0f4c5c] focus:outline-none">
+            </div>
+            <div>
+              <label for="inDoctorReg" class="block text-xs font-bold text-slate-700 mb-1">رقم القيد</label>
+              <input id="inDoctorReg" type="text" placeholder="مثال: 44821" class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:border-[#0f4c5c] focus:outline-none">
+            </div>
+          </div>
+          <div>
+            <label for="inDoctorSpec" class="block text-xs font-bold text-slate-700 mb-1">التخصص الطبي</label>
+            <input id="inDoctorSpec" type="text" value="استشاري الباطنة العامة" class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:border-[#0f4c5c] focus:outline-none">
+          </div>
+
+          <hr class="border-slate-200 my-2">
+
+          <div>
+            <label for="inPatientName" class="block text-xs font-bold text-slate-700 mb-1">اسم المريض</label>
+            <input id="inPatientName" type="text" placeholder="أدخل اسم المريض..." class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:border-[#0f4c5c] focus:outline-none">
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label for="inPatientAge" class="block text-xs font-bold text-slate-700 mb-1">العمر / السن</label>
+              <input id="inPatientAge" type="text" placeholder="مثال: 35 سنة" class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:border-[#0f4c5c] focus:outline-none">
+            </div>
+            <div>
+              <label for="inPatientGender" class="block text-xs font-bold text-slate-700 mb-1">النوع</label>
+              <select id="inPatientGender" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white focus:border-[#0f4c5c] focus:outline-none">
+                <option value="ذكر">ذكر</option>
+                <option value="أنثى">أنثى</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label for="inRxDate" class="block text-xs font-bold text-slate-700 mb-1">تاريخ الروشتة</label>
+            <input id="inRxDate" type="date" value="2026-10-29" class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:border-[#0f4c5c] focus:outline-none">
+          </div>
+          <div>
+            <label for="inDiagnosis" class="block text-xs font-bold text-slate-700 mb-1">التشخيص المبدئي / ملاحظات</label>
+            <input id="inDiagnosis" type="text" placeholder="مثال: التهاب الشعب الهوائية" class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:border-[#0f4c5c] focus:outline-none">
+          </div>
+        </div>
+      </aside>
+
+      <!-- منطقة العمل الوسطى: كتابة الأدوية (بخط اليد أو الكيبورد) + المقارنة + التأكيد + الروشتة -->
+      <div id="mainWorkspaceCol" class="lg:col-span-8 xl:col-span-9 space-y-6">
+
+        <!-- كارت كتابة الدواء (مساحة مكبرة للرسم + محرك ذكي للتعرف على الخط + خيار الكيبورد) -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 no-print">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <div>
+              <h2 class="text-base md:text-lg font-extrabold text-[#0f4c5c]">2. مساحة كتابة الأدوية الموسعة (بخط اليد أو بالكيبورد)</h2>
+              <p class="text-xs text-slate-500">محرك ذكي ثلاثي المراحل (Digital Ink Trajectory + OCR + مطابقة القوالب الحركية) يدعم الخط العربي والإنجليزي</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <button id="btnExpandCanvas" type="button" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-teal-50 text-[#0f4c5c] border border-teal-200 hover:bg-teal-100">
+                تكبير إضافي لمساحة الكتابة ⤢
+              </button>
+              <button id="modeCanvasBtn" type="button" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-[#0f4c5c] text-white">وضع خط اليد + الكيبورد</button>
+              <button id="modeKeyboardOnlyBtn" type="button" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200">وضع الكيبورد فقط</button>
+            </div>
+          </div>
+
+          <!-- لوحة الكتابة بخط اليد المكبرة -->
+          <div id="canvasContainer" class="mb-4">
+            <!-- شريط أدوات القلم واللغة والتجربة السريعة -->
+            <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200 mb-3 text-xs">
+              <div class="flex flex-wrap items-center gap-3">
+                <div class="flex items-center gap-1.5">
+                  <label for="selHandwritingLang" class="font-bold text-slate-700">لغة خط اليد:</label>
+                  <select id="selHandwritingLang" class="px-2.5 py-1 rounded-lg border border-slate-300 bg-white font-bold text-[#0f4c5c]">
+                    <option value="auto">تلقائي (عربي + إنجليزي حسب اتجاه القلم)</option>
+                    <option value="ar">عربي (خط الرقعة / النسخ)</option>
+                    <option value="en">English (Cursive / Print)</option>
+                  </select>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <label for="selPenWidth" class="font-bold text-slate-700">سمك القلم:</label>
+                  <select id="selPenWidth" class="px-2 py-1 rounded-lg border border-slate-300 bg-white font-bold">
+                    <option value="3">رفيع (3px)</option>
+                    <option value="5" selected>متوسط واضح (5px)</option>
+                    <option value="8">عريض (8px)</option>
+                  </select>
+                </div>
+                <label class="flex items-center gap-1.5 font-bold text-emerald-800 cursor-pointer">
+                  <input id="chkAutoRecognize" type="checkbox" checked class="w-4 h-4 accent-emerald-600">
+                  <span>تعرف تلقائي فور التوقف عن الكتابة</span>
+                </label>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-1.5">
+                <span id="canvasStatusText" class="text-slate-500 font-semibold">أمثلة خط جاهزة:</span>
+                <button type="button" data-preset="اوجمنتين 1000" class="presetDrawBtn px-2.5 py-1 rounded bg-teal-50 text-[#0f4c5c] border border-teal-200 font-bold hover:bg-teal-100">محاكاة خط: أوجمنتين 1000</button>
+                <button type="button" data-preset="بانادول اكسترا" class="presetDrawBtn px-2.5 py-1 rounded bg-teal-50 text-[#0f4c5c] border border-teal-200 font-bold hover:bg-teal-100">محاكاة خط: بانادول إكسترا</button>
+                <button type="button" data-preset="Cataflm 50" class="presetDrawBtn px-2.5 py-1 rounded bg-teal-50 text-[#0f4c5c] border border-teal-200 font-bold hover:bg-teal-100">محاكاة خط: Cataflm 50</button>
+                <button type="button" data-preset="كونترولوك 40" class="presetDrawBtn px-2.5 py-1 rounded bg-teal-50 text-[#0f4c5c] border border-teal-200 font-bold hover:bg-teal-100">محاكاة خط: كونترولوك 40</button>
+              </div>
+            </div>
+
+            <!-- المساحة البيضاء الكبيرة للكتابة (بارتفاع 380 بكسل قابلة للتكبير إلى 520 بكسل) -->
+            <div class="relative border-2 border-[#0f4c5c] rounded-2xl overflow-hidden bg-white shadow-inner">
+              <div class="absolute top-2.5 right-3 z-10 pointer-events-none flex items-center gap-2">
+                <span id="liveEngineStatus" class="px-2.5 py-1 rounded-full text-xs font-bold bg-slate-900/75 text-white">
+                  المساحة جاهزة — اكتب اسم الدواء بخط يدك بحرية
+                </span>
+              </div>
+              <canvas id="handwritingCanvas" width="1100" height="380" class="w-full h-[380px] canvas-box block transition-all duration-200"></canvas>
+            </div>
+
+            <!-- أزرار التحكم باللوحة + شريط الكلمات المقترحة من خط اليد -->
+            <div class="flex flex-wrap items-center justify-between gap-3 mt-3">
+              <div class="flex flex-wrap gap-2">
+                <button id="btnCanvasUndo" type="button" class="px-3.5 py-2 rounded-xl text-xs font-bold border border-slate-300 bg-slate-50 hover:bg-slate-100">
+                  تراجع عن آخر خط
+                </button>
+                <button id="btnCanvasClear" type="button" class="px-3.5 py-2 rounded-xl text-xs font-bold border border-red-200 text-red-700 bg-red-50 hover:bg-red-100">
+                  مسح المساحة البيضاء
+                </button>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-2">
+                <button id="btnRecognizeCanvas" type="button" class="px-5 py-2.5 rounded-xl text-xs md:text-sm font-extrabold bg-[#0f4c5c] hover:bg-[#136175] text-white shadow">
+                  تحويل خط اليد إلى نص ومقارنة الأدوية
+                </button>
+                <button id="btnQuickRecognizeAndAdd" type="button" class="px-5 py-2.5 rounded-xl text-xs md:text-sm font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white shadow">
+                  ⚡ تعرف على الخط + أضف أقرب دواء للروشتة فوراً
+                </button>
+              </div>
+            </div>
+
+            <!-- شريط البدائل المقروءة مباشرة من خط اليد (يظهر فور الكتابة) -->
+            <div id="inkCandidatesBar" class="mt-3 p-3 rounded-xl bg-teal-50/70 border border-teal-200 flex flex-wrap items-center gap-2 text-xs">
+              <span class="font-extrabold text-[#0f4c5c]">قراءات خط اليد المقترحة (اضغط على أي قراءة لاختيارها):</span>
+              <div id="inkSuggestionsList" class="flex flex-wrap gap-1.5">
+                <span class="text-slate-500">اكتب في اللوحة بالأعلى لتظهر قراءات خط اليد هنا تلقائياً...</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- حقل الكتابة والتعديل بالكيبورد -->
+          <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+            <label for="medicineSearchInput" class="block text-xs font-bold text-slate-800 mb-1.5">
+              النص المتعرف عليه من خط اليد / أو اكتب وعدّل بالكيبورد مباشرة (عربي أو إنجليزي):
+            </label>
+            <div class="flex flex-wrap sm:flex-nowrap gap-2">
+              <input id="medicineSearchInput" type="text" placeholder="اكتب اسم الدواء هنا بالكيبورد أو عدّل ناتج خط اليد (مثل: أوجمنتين، بانادول، Brufen، كونجيستال)..."
+                class="flex-1 w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-base font-extrabold text-[#0f4c5c] focus:border-[#0f4c5c] focus:outline-none">
+              <button id="btnMatchNow" type="button" class="px-5 py-2.5 rounded-xl text-sm font-bold bg-[#0f4c5c] hover:bg-[#136175] text-white shrink-0">
+                قارن الأدوية
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- كارت مقارنة ومطابقة الأدوية وتأكيد الطبيب -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 no-print">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <h2 class="text-base font-extrabold text-[#0f4c5c]">3. مقارنة الأدوية واختيار وتأكيد الدكتور (إضافة بضغطة واحدة)</h2>
+            <span id="matchUncertaintyBadge" class="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+              اضغط (+ أضف للروشتة فوراً) أمام الدواء المطلوب أو عدّل الجرعة بالأسفل
+            </span>
+          </div>
+
+          <div class="overflow-x-auto mb-4">
+            <table class="w-full text-right border-collapse text-xs md:text-sm">
+              <thead>
+                <tr class="border-b-2 border-[#0f4c5c] text-[#0f4c5c] bg-slate-50">
+                  <th class="p-2.5">الاسم بالعربي</th>
+                  <th class="p-2.5">الاسم بالإنجليزي</th>
+                  <th class="p-2.5">التركيز والشكل</th>
+                  <th class="p-2.5">المادة الفعالة</th>
+                  <th class="p-2.5 text-center">تشابه الاسم</th>
+                  <th class="p-2.5 text-center">اختيار / إضافة فورية للروشتة</th>
+                </tr>
+              </thead>
+              <tbody id="candidatesTableBody"></tbody>
+            </table>
+          </div>
+
+          <!-- نموذج تأكيد الدواء والجرعة قبل الإضافة للروشتة -->
+          <div id="confirmMedPanel" class="bg-teal-50/70 border-2 border-teal-300 rounded-xl p-4 space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="text-sm md:text-base font-extrabold text-slate-900">
+                الدواء المحدد حالياً للإضافة: <span id="selectedMedTitle" class="text-[#0f4c5c] underline">لم يتم اختيار دواء بعد</span>
+              </div>
+              <div class="text-xs font-bold text-slate-700">
+                التركيز المعتمد: <span id="selectedMedConc">—</span>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+              <div>
+                <label for="inDose" class="block font-bold text-slate-700 mb-1">الجرعة</label>
+                <input id="inDose" type="text" value="قرص واحد" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white font-bold">
+              </div>
+              <div>
+                <label for="inFreq" class="block font-bold text-slate-700 mb-1">التكرار</label>
+                <input id="inFreq" type="text" value="كل 12 ساعة" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white font-bold">
+              </div>
+              <div>
+                <label for="inDuration" class="block font-bold text-slate-700 mb-1">المدة</label>
+                <input id="inDuration" type="text" value="7 أيام" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white font-bold">
+              </div>
+              <div>
+                <label for="inInstructions" class="block font-bold text-slate-700 mb-1">تعليمات الاستخدام</label>
+                <input id="inInstructions" type="text" value="بعد الأكل مباشرة" class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white font-bold">
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-3 pt-2">
+              <label class="flex items-center gap-2 text-xs font-bold text-slate-800 cursor-pointer">
+                <input id="chkDoctorConfirm" type="checkbox" checked class="w-4 h-4 accent-[#0f4c5c]">
+                <span>أؤكد أنا الطبيب المعالج صحة اختيار الدواء والتركيز والجرعة المحددة أعلاه</span>
+              </label>
+              <button id="btnAddConfirmedMed" type="button" class="px-6 py-3 rounded-xl text-sm font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md transition">
+                + تأكيد وإضافة الدواء إلى الروشتة
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- كارت الروشتة النهائية الجاهزة للحفظ والطباعة A4 -->
+        <div id="finalPrescriptionCard" class="bg-white rounded-2xl shadow-md border-2 border-[#0f4c5c] p-6 print-only-sheet">
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-200 no-print">
+            <div>
+              <h2 class="text-base font-extrabold text-[#0f4c5c]">4. معاينة الروشتة النهائية وحفظها وطباعتها (A4)</h2>
+              <p class="text-xs text-slate-500">أي روشتة تحفظها أو تطبعها تُسجل تلقائياً في سجل الروشتات المحفوظة</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button id="btnSaveRxOnly" type="button" class="px-4 py-2 rounded-xl text-xs font-extrabold bg-[#0f4c5c] hover:bg-[#136175] text-white shadow-sm">
+                حفظ الروشتة في السجل
+              </button>
+              <button id="btnSaveAndPrintRx" type="button" class="px-4 py-2 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm">
+                حفظ وطباعة الروشتة (A4)
+              </button>
+            </div>
+          </div>
+
+          <!-- ترويسة الروشتة المطبوعة -->
+          <div class="flex flex-wrap justify-between items-start border-b-2 border-[#0f4c5c] pb-4 mb-4 gap-4">
+            <div>
+              <div id="pClinicName" class="text-xl font-extrabold text-[#0f4c5c]">عيادة الشفاء التخصصية</div>
+              <div class="text-sm font-bold text-slate-800 mt-1">د. <span id="pDoctorName">________________</span></div>
+              <div class="text-xs text-slate-600"><span id="pDoctorSpec">استشاري الباطنة العامة</span> | قيد نقابة: <span id="pDoctorReg">—</span></div>
+            </div>
+            <div class="text-left text-xs text-slate-700 space-y-1">
+              <div><strong>التاريخ:</strong> <span id="pRxDate">2026-10-29</span></div>
+              <div><strong>العنوان:</strong> <span id="pClinicAddress">طنطا - شارع البحر</span></div>
+              <div id="pSavedBadge" class="inline-block px-2 py-0.5 rounded bg-amber-100 text-amber-900 font-bold">مسودة قيد الإعداد</div>
+            </div>
+          </div>
+
+          <!-- شريط بيانات المريض -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs mb-4">
+            <div><strong>اسم المريض:</strong> <span id="pPatientName">________________</span></div>
+            <div><strong>العمر / النوع:</strong> <span id="pPatientAge">—</span> / <span id="pPatientGender">ذكر</span></div>
+            <div><strong>التشخيص:</strong> <span id="pDiagnosis">—</span></div>
+          </div>
+
+          <div class="text-lg font-extrabold text-[#0f4c5c] mb-2">&#8478; الأدوية الموصوفة والمؤكدة (<span id="rxItemsCountLabel">0</span>)</div>
+
+          <div class="overflow-x-auto mb-6">
+            <table class="w-full text-right border-collapse text-xs md:text-sm">
+              <thead>
+                <tr class="bg-[#0f4c5c] text-white">
+                  <th class="p-2.5 w-10 text-center">#</th>
+                  <th class="p-2.5">اسم الدواء والتركيز</th>
+                  <th class="p-2.5 text-center">الجرعة</th>
+                  <th class="p-2.5 text-center">التكرار</th>
+                  <th class="p-2.5 text-center">المدة</th>
+                  <th class="p-2.5">تعليمات الاستخدام</th>
+                  <th class="p-2.5 text-center no-print">إجراء</th>
+                </tr>
+              </thead>
+              <tbody id="rxItemsTableBody"></tbody>
+            </table>
+          </div>
+
+          <div class="flex justify-between items-end pt-6 border-t border-slate-200 text-xs text-slate-600">
+            <div>تمت المراجعة والتأكيد بواسطة الطبيب المعالج.</div>
+            <div class="w-48 border-t border-slate-900 text-center pt-1.5 font-bold text-slate-900">توقيع وختم الطبيب</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <script>
+    // قاعدة بيانات الأدوية المصرية المحلية (35 دواء معتمداً بالعربية والإنجليزية)
+    const EGYPTIAN_MEDICINES = [
+      { id: 1, ar: "بانادول إكسترا", en: "Panadol Extra", active: "Paracetamol + Caffeine", form: "أقراص مغلفة", conc: "500 mg / 65 mg", price: 54 },
+      { id: 2, ar: "بانادول أدفانس", en: "Panadol Advance", active: "Paracetamol", form: "أقراص مغلفة", conc: "500 mg", price: 46 },
+      { id: 3, ar: "أوجمنتين", en: "Augmentin", active: "Amoxicillin + Clavulanic Acid", form: "أقراص", conc: "1000 mg", price: 176 },
+      { id: 4, ar: "أوجمنتين شراب", en: "Augmentin ES Suspension", active: "Amoxicillin + Clavulanic Acid", form: "شراب معلق", conc: "600 mg / 5 ml", price: 135 },
+      { id: 5, ar: "هاي بيوتك", en: "Hibiotic", active: "Amoxicillin + Clavulanic Acid", form: "أقراص", conc: "1000 mg", price: 144 },
+      { id: 6, ar: "بروفين", en: "Brufen", active: "Ibuprofen", form: "أقراص", conc: "400 mg", price: 66 },
+      { id: 7, ar: "بروفين شراب", en: "Brufen Syrup", active: "Ibuprofen", form: "شراب", conc: "100 mg / 5 ml", price: 48 },
+      { id: 8, ar: "زيثروماكس", en: "Zithromax", active: "Azithromycin", form: "أقراص", conc: "500 mg", price: 135 },
+      { id: 9, ar: "زيسروسين", en: "Zisrocin", active: "Azithromycin", form: "كبسولات", conc: "500 mg", price: 87 },
+      { id: 10, ar: "كونجيستال", en: "Congestal", active: "Paracetamol + Chlorpheniramine + Pseudoephedrine", form: "أقراص", conc: "650 / 4 / 60 mg", price: 43 },
+      { id: 11, ar: "ون تو ثري", en: "1 2 3 (One Two Three)", active: "Paracetamol + Chlorpheniramine + Pseudoephedrine", form: "أقراص", conc: "500 mg", price: 39 },
+      { id: 12, ar: "كتافلام", en: "Cataflam", active: "Diclofenac Potassium", form: "أقراص", conc: "50 mg", price: 86 },
+      { id: 13, ar: "كتافاست", en: "Catafast", active: "Diclofenac Potassium", form: "أكياس فوارة", conc: "50 mg", price: 99 },
+      { id: 14, ar: "فولتارين", en: "Voltaren", active: "Diclofenac Sodium", form: "أمبولات للحقن", conc: "75 mg / 3 ml", price: 81 },
+      { id: 15, ar: "كونترولوك", en: "Controloc", active: "Pantoprazole", form: "أقراص للمعدة", conc: "40 mg", price: 185 },
+      { id: 16, ar: "أنتودين", en: "Antodin", active: "Famotidine", form: "أقراص", conc: "40 mg", price: 72 },
+      { id: 17, ar: "نيكسيوم", en: "Nexium", active: "Esomeprazole", form: "أقراص", conc: "40 mg", price: 266 },
+      { id: 18, ar: "أوميز", en: "Omez", active: "Omeprazole", form: "كبسولات", conc: "20 mg", price: 48 },
+      { id: 19, ar: "فلاجيل", en: "Flagyl", active: "Metronidazole", form: "أقراص", conc: "500 mg", price: 47 },
+      { id: 20, ar: "أمريزول", en: "Amrizole", active: "Metronidazole", form: "أقراص", conc: "500 mg", price: 36 },
+      { id: 21, ar: "سيبروفار", en: "Ciprofar", active: "Ciprofloxacin", form: "أقراص", conc: "500 mg", price: 69 },
+      { id: 22, ar: "تافانيك", en: "Tavanic", active: "Levofloxacin", form: "أقراص", conc: "500 mg", price: 155 },
+      { id: 23, ar: "جلوكوفاج", en: "Glucophage", active: "Metformin HCl", form: "أقراص", conc: "1000 mg", price: 75 },
+      { id: 24, ar: "سيدوفاج", en: "Cidophage", active: "Metformin HCl", form: "أقراص ممتدة", conc: "850 mg", price: 45 },
+      { id: 25, ar: "أماريل", en: "Amaryl", active: "Glimepiride", form: "أقراص", conc: "3 mg", price: 93 },
+      { id: 26, ar: "كونكور", en: "Concor", active: "Bisoprolol", form: "أقراص", conc: "5 mg", price: 81 },
+      { id: 27, ar: "كونكور بلس", en: "Concor Plus", active: "Bisoprolol + HCTZ", form: "أقراص", conc: "5 / 12.5 mg", price: 90 },
+      { id: 28, ar: "نورفاسك", en: "Norvasc", active: "Amlodipine", form: "كبسولات", conc: "5 mg", price: 96 },
+      { id: 29, ar: "بلافيكس", en: "Plavix", active: "Clopidogrel", form: "أقراص", conc: "75 mg", price: 252 },
+      { id: 30, ar: "ليبيتور", en: "Lipitor", active: "Atorvastatin", form: "أقراص", conc: "20 mg", price: 175 },
+      { id: 31, ar: "كريستور", en: "Crestor", active: "Rosuvastatin", form: "أقراص", conc: "10 mg", price: 215 },
+      { id: 32, ar: "تيلفاست", en: "Telfast", active: "Fexofenadine", form: "أقراص", conc: "180 mg", price: 115 },
+      { id: 33, ar: "زيرتك", en: "Zyrtec", active: "Cetirizine", form: "أقراص", conc: "10 mg", price: 68 },
+      { id: 34, ar: "فنتولين", en: "Ventolin", active: "Salbutamol", form: "بخاخ استنشاق", conc: "100 mcg", price: 112 },
+      { id: 35, ar: "ميلجا أدفانس", en: "Milga Advance", active: "Benfotiamine + B6 + B12", form: "أقراص", conc: "300 / 100 mg", price: 105 }
+    ];
+
+    let selectedCandidate = EGYPTIAN_MEDICINES[2];
+    let currentRxItems = [];
+    let savedPrescriptions = [];
+    let canvasStrokes = [];
+    let currentStroke = null;
+    let isDrawing = false;
+    let lastPresetText = "";
+    let autoRecTimer = null;
+    let strokeStartOrigin = performance.now();
+    let isCanvasExpanded = false;
+    let precomputedTemplates = [];
+
+    function showToast(msg) {
+      const el = document.getElementById("toastBanner");
+      el.textContent = msg;
+      el.classList.remove("hidden");
+      setTimeout(() => { el.classList.add("hidden"); }, 3200);
+    }
+
+    function setEngineStatus(msg) {
+      const el = document.getElementById("liveEngineStatus");
+      if (el) el.textContent = msg;
+    }
+
+    // تطبيع النص العربي والإنجليزي
+    function normalizeText(str, stripNumbers) {
+      if (!str) return "";
+      const easternDigits = "٠١٢٣٤٥٦٧٨٩";
+      let out = String(str);
+      for (let i = 0; i < 10; i++) {
+        out = out.split(easternDigits[i]).join(String(i));
+      }
+      out = out.replace(/[\u0610-\u061A\u064B-\u065F\u0670\u0640]/g, "");
+      out = out.replace(/[أإآٱ]/g, "ا").replace(/ة/g, "ه").replace(/[ىئ]/g, "ي").replace(/ؤ/g, "و");
+      out = out.toLowerCase();
+      if (stripNumbers && !/^\s*1\s*2\s*3/.test(out)) {
+        out = out.replace(/\b(mg|gm|mcg|ml|tab|tabs|قرص|اقراص|مجم|جم|مل|شراب)\b/gi, " ");
+        out = out.replace(/\b\d+\b/g, " ");
+      }
+      out = out.replace(/[^a-z0-9\u0600-\u06FF\s]/g, " ").replace(/\s+/g, " ").trim();
+      return out;
+    }
+
+    function similarityScore(a, b) {
+      if (!a || !b) return 0;
+      if (a === b) return 100;
+      const m = a.length, n = b.length;
+      const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+      for (let i = 0; i <= m; i++) dp[i][0] = i;
+      for (let j = 0; j <= n; j++) dp[0][j] = j;
+      for (let i = 1; i <= m; i++) {
+        for (let j = 1; j <= n; j++) {
+          const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+          dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
+        }
+      }
+      let ratio = Math.max(0, (1 - dp[m][n] / Math.max(m, n)) * 100);
+      if (b.startsWith(a) || a.startsWith(b)) {
+        ratio = Math.max(ratio, 88 + 10 * (Math.min(m, n) / Math.max(m, n)));
+      }
+      return Math.round(ratio * 10) / 10;
+    }
+
+    function matchMedicinesList(rawQuery) {
+      const qClean = normalizeText(rawQuery, true);
+      const qFull = normalizeText(rawQuery, false);
+      if (!qClean && !qFull) return EGYPTIAN_MEDICINES.slice(0, 5).map(m => ({ ...m, score: 100 }));
+
+      const scored = EGYPTIAN_MEDICINES.map(m => {
+        const nAr = normalizeText(m.ar, false);
+        const nEn = normalizeText(m.en, false);
+        const sAr = Math.max(similarityScore(qClean, nAr), similarityScore(qFull, nAr));
+        const sEn = Math.max(similarityScore(qClean, nEn), similarityScore(qFull, nEn));
+        let best = Math.max(sAr, sEn);
+        const numMatch = qFull.match(/\b\d+\b/);
+        if (numMatch && m.conc.includes(numMatch[0])) {
+          best = Math.min(100, Math.round((best + 2.5) * 10) / 10);
+        }
+        return { ...m, score: best };
+      });
+      scored.sort((a, b) => b.score - a.score);
+      return scored.slice(0, 5);
+    }
+
+    // ------------------------------------------------------------------
+    // محرك التعرف الذكي متعدد المراحل على خط اليد (Multi-Stage HTR Engine)
+    // المرحلة 1: Google Digital Ink Stroke Recognizer (إحداثيات القلم المباشرة عربي/إنجليزي)
+    // المرحلة 2: مطابقة البصمة البصرية والحركية للخط (2D Spatial Ink Grid + Stroke Kinematics)
+    // المرحلة 3: Tesseract.js Offline Neural OCR
+    // ------------------------------------------------------------------
+    function extractInkGridFeature(sourceCanvas, bbox) {
+      const gridW = 28, gridH = 10;
+      const off = document.createElement("canvas");
+      off.width = gridW;
+      off.height = gridH;
+      const octx = off.getContext("2d");
+      octx.fillStyle = "#ffffff";
+      octx.fillRect(0, 0, gridW, gridH);
+      const bw = Math.max(10, bbox.maxX - bbox.minX);
+      const bh = Math.max(10, bbox.maxY - bbox.minY);
+      octx.drawImage(sourceCanvas, bbox.minX, bbox.minY, bw, bh, 0, 0, gridW, gridH);
+      const imgData = octx.getImageData(0, 0, gridW, gridH).data;
+      const vec = [];
+      for (let i = 0; i < imgData.length; i += 4) {
+        const lum = (imgData[i] + imgData[i + 1] + imgData[i + 2]) / 3;
+        vec.push(lum < 220 ? (255 - lum) / 255.0 : 0);
+      }
+      return { vec, aspect: bw / bh };
+    }
+
+    function buildOfflineVisualTemplates() {
+      precomputedTemplates = [];
+      const tempCanvas = document.createElement("canvas");
+      tempCanvas.width = 500;
+      tempCanvas.height = 140;
+      const tctx = tempCanvas.getContext("2d");
+
+      EGYPTIAN_MEDICINES.forEach(med => {
+        [
+          { label: med.ar, script: "ar" },
+          { label: med.en.split(" ")[0], script: "en" },
+          { label: med.en, script: "en" }
+        ].forEach(variant => {
+          tctx.fillStyle = "#ffffff";
+          tctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+          tctx.fillStyle = "#0f172a";
+          tctx.font = "bold 42px 'Cairo', 'Inter', sans-serif";
+          tctx.textBaseline = "middle";
+          tctx.fillText(variant.label, 30, 70);
+
+          const raw = tctx.getImageData(0, 0, tempCanvas.width, tempCanvas.height).data;
+          let minX = tempCanvas.width, minY = tempCanvas.height, maxX = 0, maxY = 0, found = false;
+          for (let y = 0; y < tempCanvas.height; y += 2) {
+            for (let x = 0; x < tempCanvas.width; x += 2) {
+              const idx = (y * tempCanvas.width + x) * 4;
+              if (raw[idx] < 220) {
+                found = true;
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+              }
+            }
+          }
+          if (found) {
+            const feat = extractInkGridFeature(tempCanvas, { minX, minY, maxX, maxY });
+            precomputedTemplates.push({
+              med,
+              text: variant.label,
+              script: variant.script,
+              vec: feat.vec,
+              aspect: feat.aspect,
+              charLen: variant.label.length
+            });
+          }
+        });
+      });
+    }
+
+    function getStrokesBoundingBoxAndKinematics() {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      let netDx = 0, dotCount = 0, primaryStrokes = 0;
+      canvasStrokes.forEach(s => {
+        let len = 0;
+        for (let i = 0; i < s.points.length; i++) {
+          const p = s.points[i];
+          if (p.x < minX) minX = p.x;
+          if (p.x > maxX) maxX = p.x;
+          if (p.y < minY) minY = p.y;
+          if (p.y > maxY) maxY = p.y;
+          if (i > 0) {
+            len += Math.hypot(p.x - s.points[i - 1].x, p.y - s.points[i - 1].y);
+          }
+        }
+        if (len < 18) {
+          dotCount++;
+        } else if (s.points.length >= 2) {
+          primaryStrokes++;
+          netDx += (s.points[s.points.length - 1].x - s.points[0].x);
+        }
+      });
+      if (!isFinite(minX)) return null;
+      const selLang = document.getElementById("selHandwritingLang").value;
+      const inferredScript = selLang !== "auto" ? selLang : (netDx < -8 ? "ar" : "en");
+      return {
+        minX: Math.max(0, minX - 8),
+        minY: Math.max(0, minY - 8),
+        maxX: maxX + 8,
+        maxY: maxY + 8,
+        netDx,
+        dotCount,
+        primaryStrokes,
+        inferredScript
+      };
+    }
+
+    function matchOfflineVisualTemplates(canvasEl, kin) {
+      if (!precomputedTemplates.length) buildOfflineVisualTemplates();
+      const userFeat = extractInkGridFeature(canvasEl, kin);
+      const candidates = [];
+
+      precomputedTemplates.forEach(tpl => {
+        if (tpl.script !== kin.inferredScript) return;
+        let dotProd = 0, normA = 0, normB = 0;
+        for (let i = 0; i < userFeat.vec.length; i++) {
+          dotProd += userFeat.vec[i] * tpl.vec[i];
+          normA += userFeat.vec[i] * userFeat.vec[i];
+          normB += tpl.vec[i] * tpl.vec[i];
+        }
+        const cosine = (normA > 0 && normB > 0) ? (dotProd / (Math.sqrt(normA) * Math.sqrt(normB))) : 0;
+        const aspectDiff = Math.abs(userFeat.aspect - tpl.aspect) / Math.max(1.5, tpl.aspect);
+        const score = cosine * 0.75 + Math.max(0, 1 - aspectDiff) * 0.25;
+        candidates.push({ text: tpl.text, score });
+      });
+
+      candidates.sort((a, b) => b.score - a.score);
+      const unique = [];
+      const seen = new Set();
+      for (const c of candidates) {
+        if (!seen.has(c.text)) {
+          seen.add(c.text);
+          unique.push(c.text);
+        }
+        if (unique.length >= 5) break;
+      }
+      return unique;
+    }
+
+    async function queryDigitalInkStrokeAPI(canvasEl, kin) {
+      const trace = canvasStrokes.map(s => [
+        s.points.map(p => Math.round(p.x)),
+        s.points.map(p => Math.round(p.y)),
+        s.points.map(p => Math.round(p.t || 0))
+      ]);
+      const langCode = kin.inferredScript === "ar" ? "ar" : "en";
+      const payload = {
+        app_version: 0.4,
+        api_level: "537.36",
+        device: "5.0 (Windows NT 10.0; Win64; x64)",
+        input_type: 0,
+        options: "enable_pre_space",
+        requests: [{
+          writing_guide: { writing_area_width: canvasEl.width, writing_area_height: canvasEl.height },
+          ink: trace,
+          language: langCode
+        }]
+      };
+      const resp = await fetch("https://inputtools.google.com/request?ime=handwriting&app=mobilesearch&cs=1&oe=UTF-8", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!resp.ok) throw new Error("Digital Ink HTTP " + resp.status);
+      const data = await resp.json();
+      if (data && data[0] === "SUCCESS" && data[1] && data[1][0] && data[1][0][1]) {
+        return data[1][0][1];
+      }
+      throw new Error("Empty Digital Ink response");
+    }
+
+    function renderInkSuggestionsPills(suggestions, sourceLabel) {
+      const container = document.getElementById("inkSuggestionsList");
+      container.innerHTML = "";
+      if (!suggestions || !suggestions.length) {
+        container.innerHTML = `<span class="text-slate-500">لا توجد قراءات بعد...</span>`;
+        return;
+      }
+      suggestions.forEach((word, i) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = i === 0
+          ? "px-3 py-1 rounded-lg font-extrabold bg-[#0f4c5c] text-white shadow-sm"
+          : "px-3 py-1 rounded-lg font-bold bg-white text-slate-800 border border-teal-300 hover:bg-teal-100";
+        btn.textContent = (i === 0 ? "★ " : "") + word;
+        btn.addEventListener("click", () => {
+          document.getElementById("medicineSearchInput").value = word;
+          renderCandidates(word);
+          showToast("تم اختيار القراءة: " + word);
+        });
+        container.appendChild(btn);
+      });
+      setEngineStatus(sourceLabel + " — القراءة الأولى: " + suggestions[0]);
+    }
+
+    async function runSmartHandwritingRecognition(autoAddTopMedicine) {
+      const canvasEl = document.getElementById("handwritingCanvas");
+      const inputEl = document.getElementById("medicineSearchInput");
+
+      if (lastPresetText && canvasStrokes.length === 0) {
+        inputEl.value = lastPresetText;
+        renderInkSuggestionsPills([lastPresetText], "نموذج خط محاكي");
+        renderCandidates(lastPresetText);
+        if (autoAddTopMedicine && selectedCandidate) {
+          addCandidateDirectlyToPrescription(selectedCandidate);
+        }
+        return;
+      }
+
+      const kin = getStrokesBoundingBoxAndKinematics();
+      if (!kin) {
+        if (inputEl.value.trim()) {
+          renderCandidates(inputEl.value.trim());
+          if (autoAddTopMedicine && selectedCandidate) {
+            addCandidateDirectlyToPrescription(selectedCandidate);
+          }
+        } else {
+          showToast("اكتب اسم الدواء أولاً بالماوس أو القلم في المساحة البيضاء!");
+        }
+        return;
+      }
+
+      setEngineStatus("جاري التعرف الذكي على خط اليد (" + (kin.inferredScript === "ar" ? "عربي" : "إنجليزي") + ")...");
+
+      let recognizedList = [];
+      let engineUsed = "";
+
+      // المرحلة 1: محرك Digital Ink لإحداثيات القلم المباشرة (عربي + إنجليزي بدقة عالية جداً)
+      try {
+        const inkResults = await queryDigitalInkStrokeAPI(canvasEl, kin);
+        if (inkResults && inkResults.length > 0) {
+          recognizedList = inkResults.slice(0, 6);
+          engineUsed = "محرك Digital Ink الذكي لإحداثيات القلم";
+        }
+      } catch (err) {
+        // في حال عدم توفر اتصال خارجي، ننتقل تلقائياً للمحرك المحلي المدمج
+      }
+
+      // المرحلة 2: المحرك المحلي للبصمة البصرية والحركية + Tesseract.js
+      if (recognizedList.length === 0) {
+        const localVisualMatches = matchOfflineVisualTemplates(canvasEl, kin);
+        if (window.Tesseract && kin.inferredScript === "en") {
+          try {
+            const res = await window.Tesseract.recognize(canvasEl, "eng");
+            const cleanOcr = (res && res.data && res.data.text ? res.data.text : "").trim();
+            if (cleanOcr.length >= 2) {
+              recognizedList.push(cleanOcr);
+            }
+          } catch (e) {}
+        }
+        recognizedList = [...recognizedList, ...localVisualMatches].slice(0, 5);
+        engineUsed = "المحرك المحلي للبصمة الحركية للأدوية المصرية";
+      }
+
+      if (recognizedList.length > 0) {
+        // نختار أفضل قراءة تطابق معجم الأدوية المصرية
+        let bestWord = recognizedList[0];
+        let bestLexScore = -1;
+        recognizedList.slice(0, 4).forEach(candidateWord => {
+          const topMed = matchMedicinesList(candidateWord)[0];
+          if (topMed && topMed.score > bestLexScore) {
+            bestLexScore = topMed.score;
+            bestWord = candidateWord;
+          }
+        });
+
+        inputEl.value = bestWord;
+        renderInkSuggestionsPills(recognizedList, engineUsed);
+        renderCandidates(bestWord);
+
+        if (autoAddTopMedicine && selectedCandidate) {
+          addCandidateDirectlyToPrescription(selectedCandidate);
+        } else {
+          showToast("تم التعرف على الخط: (" + bestWord + ") — اضغط (+ أضف للروشتة فوراً) لإضافته!");
+        }
+      }
+    }
+
+    function addCandidateDirectlyToPrescription(medObj) {
+      if (!medObj) return;
+      currentRxItems.push({
+        id: medObj.id,
+        ar: medObj.ar,
+        en: medObj.en,
+        conc: medObj.conc,
+        form: medObj.form,
+        dose: document.getElementById("inDose").value || "قرص واحد",
+        freq: document.getElementById("inFreq").value || "كل 12 ساعة",
+        duration: document.getElementById("inDuration").value || "7 أيام",
+        instructions: document.getElementById("inInstructions").value || "بعد الأكل مباشرة"
+      });
+      renderRxItemsTable();
+      showToast("تمت إضافة (" + medObj.ar + " - " + medObj.conc + ") إلى الروشتة بنجاح!");
+    }
+
+    function renderCandidates(queryStr) {
+      const top5 = matchMedicinesList(queryStr);
+      const tbody = document.getElementById("candidatesTableBody");
+      const badge = document.getElementById("matchUncertaintyBadge");
+      tbody.innerHTML = "";
+
+      if (top5.length > 0 && queryStr.trim() !== "") {
+        selectedCandidate = top5[0];
+        updateSelectedCandidateBanner();
+      }
+
+      if (top5.length >= 2 && (top5[0].score - top5[1].score) < 5 && queryStr.trim() !== "") {
+        badge.textContent = "تنبيه: تشابه قريب بين (" + top5[0].ar + " / " + top5[1].ar + ") — يرجى التأكد قبل الإضافة";
+        badge.className = "text-xs font-bold px-2.5 py-1 rounded-full bg-red-50 text-red-700 border border-red-200";
+      } else {
+        badge.textContent = "اضغط (+ أضف للروشتة فوراً) أمام الدواء المطلوب لإضافته مباشرة";
+        badge.className = "text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200";
+      }
+
+      top5.forEach((med) => {
+        const isSelected = selectedCandidate && selectedCandidate.id === med.id;
+        const tr = document.createElement("tr");
+        tr.className = isSelected ? "bg-teal-50/90 border-b border-teal-200 font-bold" : "border-b border-slate-100 hover:bg-slate-50";
+        tr.innerHTML = `
+          <td class="p-2.5 text-slate-900">${med.ar}</td>
+          <td class="p-2.5 text-slate-700">${med.en}</td>
+          <td class="p-2.5 text-slate-600">${med.conc} <span class="text-xs text-slate-400">(${med.form})</span></td>
+          <td class="p-2.5 text-xs text-slate-500">${med.active}</td>
+          <td class="p-2.5 text-center"><span class="px-2 py-0.5 rounded bg-slate-100 text-slate-800 font-bold">${med.score}%</span></td>
+          <td class="p-2.5 text-center">
+            <div class="flex flex-wrap items-center justify-center gap-1.5">
+              <button type="button" data-med-id="${med.id}" class="selectCandidateBtn px-2.5 py-1.5 rounded-lg text-xs font-bold ${isSelected ? 'bg-[#0f4c5c] text-white' : 'bg-slate-200 text-slate-800 hover:bg-slate-300'}">
+                ${isSelected ? 'محدد للتعديل ✓' : 'تحديد'}
+              </button>
+              <button type="button" data-quick-add-id="${med.id}" class="quickAddMedBtn px-3 py-1.5 rounded-lg text-xs font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm">
+                + أضف للروشتة فوراً
+              </button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      document.querySelectorAll(".selectCandidateBtn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const id = parseInt(btn.getAttribute("data-med-id"), 10);
+          const found = EGYPTIAN_MEDICINES.find(x => x.id === id);
+          if (found) {
+            selectedCandidate = found;
+            updateSelectedCandidateBanner();
+            renderCandidates(document.getElementById("medicineSearchInput").value);
+          }
+        });
+      });
+
+      document.querySelectorAll(".quickAddMedBtn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const id = parseInt(btn.getAttribute("data-quick-add-id"), 10);
+          const found = EGYPTIAN_MEDICINES.find(x => x.id === id);
+          if (found) {
+            selectedCandidate = found;
+            updateSelectedCandidateBanner();
+            addCandidateDirectlyToPrescription(found);
+          }
+        });
+      });
+    }
+
+    function updateSelectedCandidateBanner() {
+      if (!selectedCandidate) return;
+      document.getElementById("selectedMedTitle").textContent = `${selectedCandidate.ar} (${selectedCandidate.en})`;
+      document.getElementById("selectedMedConc").textContent = `${selectedCandidate.conc} — ${selectedCandidate.form}`;
+    }
+
+    function syncMetadataToPreview() {
+      document.getElementById("pClinicName").textContent = document.getElementById("inClinicName").value || "عيادة طبية";
+      document.getElementById("pClinicAddress").textContent = document.getElementById("inClinicAddress").value || "—";
+      document.getElementById("pDoctorName").textContent = document.getElementById("inDoctorName").value || "________________";
+      document.getElementById("pDoctorReg").textContent = document.getElementById("inDoctorReg").value || "—";
+      document.getElementById("pDoctorSpec").textContent = document.getElementById("inDoctorSpec").value || "—";
+      document.getElementById("pPatientName").textContent = document.getElementById("inPatientName").value || "________________";
+      document.getElementById("pPatientAge").textContent = document.getElementById("inPatientAge").value || "—";
+      document.getElementById("pPatientGender").textContent = document.getElementById("inPatientGender").value || "—";
+      document.getElementById("pRxDate").textContent = document.getElementById("inRxDate").value || "2026-10-29";
+      document.getElementById("pDiagnosis").textContent = document.getElementById("inDiagnosis").value || "—";
+    }
+
+    function renderRxItemsTable() {
+      const tbody = document.getElementById("rxItemsTableBody");
+      const countLbl = document.getElementById("rxItemsCountLabel");
+      if (countLbl) countLbl.textContent = currentRxItems.length;
+      tbody.innerHTML = "";
+      if (currentRxItems.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-400">لم تتم إضافة أدوية للروشتة بعد. اكتب اسم الدواء ثم اضغط (+ أضف للروشتة فوراً).</td></tr>`;
+        return;
+      }
+      currentRxItems.forEach((item, idx) => {
+        const tr = document.createElement("tr");
+        tr.className = "border-b border-slate-200";
+        tr.innerHTML = `
+          <td class="p-2.5 text-center font-bold">${idx + 1}</td>
+          <td class="p-2.5">
+            <div class="font-bold text-slate-900">${item.ar} (${item.en})</div>
+            <div class="text-xs text-slate-500">التركيز: ${item.conc} | ${item.form}</div>
+          </td>
+          <td class="p-2.5 text-center">${item.dose}</td>
+          <td class="p-2.5 text-center">${item.freq}</td>
+          <td class="p-2.5 text-center">${item.duration}</td>
+          <td class="p-2.5">${item.instructions}</td>
+          <td class="p-2.5 text-center no-print">
+            <button type="button" data-rm-idx="${idx}" class="removeRxItemBtn px-2.5 py-1 rounded bg-red-50 text-red-700 font-bold text-xs hover:bg-red-100">حذف</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      document.querySelectorAll(".removeRxItemBtn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const i = parseInt(btn.getAttribute("data-rm-idx"), 10);
+          currentRxItems.splice(i, 1);
+          renderRxItemsTable();
+        });
+      });
+    }
+
+    function loadSavedPrescriptions() {
+      try {
+        const raw = localStorage.getItem("egypt_saved_prescriptions_v1");
+        if (raw) savedPrescriptions = JSON.parse(raw);
+      } catch (e) {
+        savedPrescriptions = [];
+      }
+      if (savedPrescriptions.length === 0) {
+        savedPrescriptions = [{
+          rxId: 1001,
+          clinicName: "عيادة الشفاء التخصصية",
+          clinicAddress: "طنطا - شارع البحر",
+          doctorName: "طارق السيد",
+          doctorSpec: "استشاري الباطنة العامة",
+          doctorReg: "44821",
+          patientName: "محمود عبد الرحمن",
+          patientAge: "41 سنة",
+          patientGender: "ذكر",
+          rxDate: "2026-10-29",
+          diagnosis: "التهاب الشعب الهوائية الحاد",
+          items: [
+            { id: 3, ar: "أوجمنتين", en: "Augmentin", conc: "1000 mg", form: "أقراص", dose: "قرص واحد", freq: "كل 12 ساعة", duration: "7 أيام", instructions: "بعد الأكل مباشرة" },
+            { id: 1, ar: "بانادول إكسترا", en: "Panadol Extra", conc: "500 mg / 65 mg", form: "أقراص مغلفة", dose: "قرص واحد", freq: "كل 8 ساعات عند اللزوم", duration: "5 أيام", instructions: "بعد الأكل" }
+          ]
+        }];
+      }
+      updateSavedPrescriptionsUI();
+    }
+
+    function persistSavedPrescriptions() {
+      try {
+        localStorage.setItem("egypt_saved_prescriptions_v1", JSON.stringify(savedPrescriptions));
+      } catch (e) {}
+      updateSavedPrescriptionsUI();
+    }
+
+    function updateSavedPrescriptionsUI() {
+      document.getElementById("savedCountBadge").textContent = savedPrescriptions.length;
+      document.getElementById("statSavedRxCount").textContent = savedPrescriptions.length;
+      const listEl = document.getElementById("savedPrescriptionsList");
+      listEl.innerHTML = "";
+      savedPrescriptions.forEach((rx) => {
+        const card = document.createElement("div");
+        card.className = "p-4 rounded-xl border border-slate-200 bg-slate-50 flex flex-wrap items-center justify-between gap-3";
+        const medsSummary = rx.items.map(i => i.ar).join(" + ");
+        card.innerHTML = `
+          <div>
+            <div class="font-extrabold text-slate-900 text-sm">روشتة محفوظة #${rx.rxId} — المريض: ${rx.patientName || 'غير محدد'} (${rx.patientAge || '—'})</div>
+            <div class="text-xs text-slate-600 mt-0.5">د. ${rx.doctorName || '—'} | ${rx.clinicName} | التاريخ: ${rx.rxDate}</div>
+            <div class="text-xs text-[#0f4c5c] font-bold mt-1">الأدوية (${rx.items.length}): ${medsSummary}</div>
+          </div>
+          <div class="flex gap-2">
+            <button type="button" data-open-rx="${rx.rxId}" class="openSavedRxBtn px-3.5 py-2 rounded-lg text-xs font-bold bg-[#0f4c5c] text-white hover:bg-[#136175]">
+              فتح ومعاينة وطباعة الروشتة
+            </button>
+          </div>
+        `;
+        listEl.appendChild(card);
+      });
+
+      document.querySelectorAll(".openSavedRxBtn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const rxId = parseInt(btn.getAttribute("data-open-rx"), 10);
+          const found = savedPrescriptions.find(r => r.rxId === rxId);
+          if (found) {
+            document.getElementById("inClinicName").value = found.clinicName || "";
+            document.getElementById("inClinicAddress").value = found.clinicAddress || "";
+            document.getElementById("inDoctorName").value = found.doctorName || "";
+            document.getElementById("inDoctorSpec").value = found.doctorSpec || "";
+            document.getElementById("inDoctorReg").value = found.doctorReg || "";
+            document.getElementById("inPatientName").value = found.patientName || "";
+            document.getElementById("inPatientAge").value = found.patientAge || "";
+            document.getElementById("inPatientGender").value = found.patientGender || "ذكر";
+            document.getElementById("inRxDate").value = found.rxDate || "2026-10-29";
+            document.getElementById("inDiagnosis").value = found.diagnosis || "";
+            currentRxItems = found.items.map(x => ({ ...x }));
+            syncMetadataToPreview();
+            renderRxItemsTable();
+            document.getElementById("pSavedBadge").textContent = "روشتة محفوظة #" + found.rxId;
+            document.getElementById("pSavedBadge").className = "inline-block px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 font-bold";
+            switchView("workspace");
+            showToast("تم فتح الروشتة المحفوظة #" + found.rxId);
+          }
+        });
+      });
+    }
+
+    function saveCurrentPrescription(triggerPrint) {
+      if (currentRxItems.length === 0) {
+        showToast("يرجى إضافة دواء واحد على الأقل للروشتة قبل الحفظ!");
+        return;
+      }
+      syncMetadataToPreview();
+      const newId = 1001 + savedPrescriptions.length;
+      const rxRecord = {
+        rxId: newId,
+        clinicName: document.getElementById("inClinicName").value || "عيادة الشفاء التخصصية",
+        clinicAddress: document.getElementById("inClinicAddress").value || "",
+        doctorName: document.getElementById("inDoctorName").value || "طبيب معالج",
+        doctorSpec: document.getElementById("inDoctorSpec").value || "",
+        doctorReg: document.getElementById("inDoctorReg").value || "",
+        patientName: document.getElementById("inPatientName").value || "مريض بالعيادة",
+        patientAge: document.getElementById("inPatientAge").value || "",
+        patientGender: document.getElementById("inPatientGender").value || "ذكر",
+        rxDate: document.getElementById("inRxDate").value || "2026-10-29",
+        diagnosis: document.getElementById("inDiagnosis").value || "",
+        items: currentRxItems.map(x => ({ ...x }))
+      };
+      savedPrescriptions.unshift(rxRecord);
+      persistSavedPrescriptions();
+      document.getElementById("pSavedBadge").textContent = "تم الحفظ في السجل (#" + newId + ") — مؤكدة من الطبيب";
+      document.getElementById("pSavedBadge").className = "inline-block px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 font-bold";
+      showToast("تم حفظ الروشتة #" + newId + " تلقائياً في سجل الروشتات المحفوظة!");
+      if (triggerPrint) {
+        setTimeout(() => { window.print(); }, 250);
+      }
+    }
+
+    function switchView(viewName) {
+      const home = document.getElementById("homeView");
+      const ws = document.getElementById("workspaceView");
+      if (viewName === "workspace") {
+        home.classList.add("hidden");
+        ws.classList.remove("hidden");
+      } else {
+        ws.classList.add("hidden");
+        home.classList.remove("hidden");
+      }
+    }
+
+    // إعداد لوحة الرسم الموسعة بخط اليد (HTML5 Canvas 1100x380)
+    function initHandwritingCanvas() {
+      const canvas = document.getElementById("handwritingCanvas");
+      const ctx = canvas.getContext("2d");
+
+      function redrawCanvas() {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // خطوط إرشادية خفيفة للكتابة المريحة
+        ctx.strokeStyle = "#e2e8f0";
+        ctx.lineWidth = 1.5;
+        [135, 245, 340].forEach(yLine => {
+          ctx.beginPath();
+          ctx.moveTo(30, yLine);
+          ctx.lineTo(canvas.width - 30, yLine);
+          ctx.stroke();
+        });
+
+        if (lastPresetText) {
+          ctx.fillStyle = "#0f172a";
+          ctx.font = "italic bold 58px 'Cairo', sans-serif";
+          ctx.fillText(lastPresetText, 180, 210);
+        }
+
+        const baseWidth = parseFloat(document.getElementById("selPenWidth").value || "5");
+        ctx.strokeStyle = "#0f172a";
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        for (const s of canvasStrokes) {
+          if (!s.points.length) continue;
+          if (s.points.length === 1) {
+            const p0 = s.points[0];
+            ctx.fillStyle = "#0f172a";
+            ctx.beginPath();
+            ctx.arc(p0.x, p0.y, baseWidth * 0.6, 0, Math.PI * 2);
+            ctx.fill();
+            continue;
+          }
+          for (let i = 1; i < s.points.length; i++) {
+            const p0 = s.points[i - 1], p1 = s.points[i];
+            ctx.lineWidth = Math.max(2, baseWidth * (0.7 + 0.5 * ((p0.p + p1.p) * 0.5)));
+            ctx.beginPath();
+            ctx.moveTo(p0.x, p0.y);
+            ctx.lineTo(p1.x, p1.y);
+            ctx.stroke();
+          }
+        }
+      }
+
+      function getPt(ev) {
+        const rect = canvas.getBoundingClientRect();
+        return {
+          x: (ev.clientX - rect.left) * (canvas.width / rect.width),
+          y: (ev.clientY - rect.top) * (canvas.height / rect.height),
+          t: Math.round(performance.now() - strokeStartOrigin),
+          p: ev.pressure && ev.pressure > 0 ? ev.pressure : 0.65
+        };
+      }
+
+      canvas.addEventListener("pointerdown", (ev) => {
+        ev.preventDefault();
+        if (autoRecTimer) {
+          clearTimeout(autoRecTimer);
+          autoRecTimer = null;
+        }
+        if (canvasStrokes.length === 0) {
+          strokeStartOrigin = performance.now();
+        }
+        lastPresetText = "";
+        isDrawing = true;
+        currentStroke = { points: [getPt(ev)] };
+        canvasStrokes.push(currentStroke);
+        setEngineStatus("جاري الكتابة... (عدد الخطوط: " + canvasStrokes.length + ")");
+        redrawCanvas();
+      });
+
+      canvas.addEventListener("pointermove", (ev) => {
+        if (!isDrawing || !currentStroke) return;
+        ev.preventDefault();
+        currentStroke.points.push(getPt(ev));
+        redrawCanvas();
+      });
+
+      function stopDraw() {
+        if (!isDrawing) return;
+        isDrawing = false;
+        currentStroke = null;
+        if (document.getElementById("chkAutoRecognize").checked && canvasStrokes.length > 0) {
+          if (autoRecTimer) clearTimeout(autoRecTimer);
+          autoRecTimer = setTimeout(() => {
+            runSmartHandwritingRecognition(false);
+          }, 850);
+        }
+      }
+      canvas.addEventListener("pointerup", stopDraw);
+      canvas.addEventListener("pointercancel", stopDraw);
+      canvas.addEventListener("pointerleave", stopDraw);
+
+      document.getElementById("btnCanvasUndo").addEventListener("click", () => {
+        canvasStrokes.pop();
+        redrawCanvas();
+        if (canvasStrokes.length > 0 && document.getElementById("chkAutoRecognize").checked) {
+          runSmartHandwritingRecognition(false);
+        }
+      });
+
+      document.getElementById("btnCanvasClear").addEventListener("click", () => {
+        if (autoRecTimer) clearTimeout(autoRecTimer);
+        canvasStrokes = [];
+        lastPresetText = "";
+        redrawCanvas();
+        setEngineStatus("تم مسح اللوحة — جاهزة للكتابة");
+      });
+
+      document.querySelectorAll(".presetDrawBtn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          lastPresetText = btn.getAttribute("data-preset") || "";
+          canvasStrokes = [];
+          redrawCanvas();
+          document.getElementById("medicineSearchInput").value = lastPresetText;
+          renderInkSuggestionsPills([lastPresetText], "نموذج خط جاهز");
+          renderCandidates(lastPresetText);
+          showToast("تمت محاكاة خط اليد ومطابقة الدواء: " + lastPresetText + " — اضغط (+ أضف للروشتة فوراً)");
+        });
+      });
+
+      document.getElementById("btnRecognizeCanvas").addEventListener("click", () => {
+        runSmartHandwritingRecognition(false);
+      });
+
+      document.getElementById("btnQuickRecognizeAndAdd").addEventListener("click", () => {
+        runSmartHandwritingRecognition(true);
+      });
+
+      // زر تكبير وتوسيع مساحة الكتابة
+      document.getElementById("btnExpandCanvas").addEventListener("click", () => {
+        isCanvasExpanded = !isCanvasExpanded;
+        const sidebar = document.getElementById("sidebarPanel");
+        const mainCol = document.getElementById("mainWorkspaceCol");
+        const btn = document.getElementById("btnExpandCanvas");
+        if (isCanvasExpanded) {
+          canvas.className = "w-full h-[520px] canvas-box block transition-all duration-200";
+          sidebar.classList.add("hidden");
+          mainCol.className = "lg:col-span-12 space-y-6";
+          btn.textContent = "إرجاع الحجم الطبيعي وإظهار القائمة الجانبية ⤡";
+          showToast("تم توسيع مساحة الكتابة لملء الشاشة بالكامل!");
+        } else {
+          canvas.className = "w-full h-[380px] canvas-box block transition-all duration-200";
+          sidebar.classList.remove("hidden");
+          mainCol.className = "lg:col-span-8 xl:col-span-9 space-y-6";
+          btn.textContent = "تكبير إضافي لمساحة الكتابة ⤢";
+        }
+        redrawCanvas();
+      });
+
+      redrawCanvas();
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      buildOfflineVisualTemplates();
+      loadSavedPrescriptions();
+      initHandwritingCanvas();
+      updateSelectedCandidateBanner();
+      renderCandidates("");
+      renderRxItemsTable();
+
+      document.getElementById("navHomeBtn").addEventListener("click", () => switchView("home"));
+      document.getElementById("backToHomeBtn").addEventListener("click", () => switchView("home"));
+      document.getElementById("navNewRxBtn").addEventListener("click", () => {
+        currentRxItems = [];
+        renderRxItemsTable();
+        document.getElementById("pSavedBadge").textContent = "مسودة قيد الإعداد";
+        document.getElementById("pSavedBadge").className = "inline-block px-2 py-0.5 rounded bg-amber-100 text-amber-900 font-bold";
+        switchView("workspace");
+      });
+      document.getElementById("heroStartRxBtn").addEventListener("click", () => {
+        switchView("workspace");
+      });
+
+      document.getElementById("modeCanvasBtn").addEventListener("click", () => {
+        document.getElementById("canvasContainer").classList.remove("hidden");
+        document.getElementById("modeCanvasBtn").className = "px-3 py-1.5 rounded-lg text-xs font-bold bg-[#0f4c5c] text-white";
+        document.getElementById("modeKeyboardOnlyBtn").className = "px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-700";
+      });
+      document.getElementById("modeKeyboardOnlyBtn").addEventListener("click", () => {
+        document.getElementById("canvasContainer").classList.add("hidden");
+        document.getElementById("modeKeyboardOnlyBtn").className = "px-3 py-1.5 rounded-lg text-xs font-bold bg-[#0f4c5c] text-white";
+        document.getElementById("modeCanvasBtn").className = "px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-700";
+        document.getElementById("medicineSearchInput").focus();
+      });
+
+      document.getElementById("medicineSearchInput").addEventListener("input", (e) => {
+        renderCandidates(e.target.value);
+      });
+      document.getElementById("btnMatchNow").addEventListener("click", () => {
+        renderCandidates(document.getElementById("medicineSearchInput").value);
+      });
+
+      ["inClinicName", "inClinicAddress", "inDoctorName", "inDoctorReg", "inDoctorSpec", "inPatientName", "inPatientAge", "inPatientGender", "inRxDate", "inDiagnosis"].forEach(id => {
+        document.getElementById(id).addEventListener("input", syncMetadataToPreview);
+        document.getElementById(id).addEventListener("change", syncMetadataToPreview);
+      });
+
+      document.getElementById("btnAddConfirmedMed").addEventListener("click", () => {
+        if (!document.getElementById("chkDoctorConfirm").checked) {
+          showToast("يرجى تفعيل مربع تأكيد الطبيب أولاً قبل إضافة الدواء!");
+          return;
+        }
+        if (!selectedCandidate) {
+          showToast("يرجى اختيار الدواء من جدول المقارنة أولاً!");
+          return;
+        }
+        addCandidateDirectlyToPrescription(selectedCandidate);
+      });
+
+      document.getElementById("btnSaveRxOnly").addEventListener("click", () => saveCurrentPrescription(false));
+      document.getElementById("btnSaveAndPrintRx").addEventListener("click", () => saveCurrentPrescription(true));
+    });
+  </script>
+</body>
+</html>
